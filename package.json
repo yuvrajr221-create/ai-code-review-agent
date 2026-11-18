@@ -1,0 +1,11 @@
+{
+  "name": "ai-review-agent",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "license": "MIT",
+  "dependencies": {
+    "@forge/api": "^6.0.0",
+    "@forge/kvs": "^1.0.0",
+    "@forge/resolver": "^1.6.0"
+  }
+}

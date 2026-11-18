@@ -1,0 +1,84 @@
+modules:
+  rovo:agent:
+    - key: code-review-agent
+      name: AI Code Review Agent
+      description: Reviews code or diffs against a Jira issue's requirements and saves
+        the result on the issue.
+      conversationStarters:
+        - Review the code I paste against issue PROJ-123
+        - Summarise the risk level of PROJ-123
+      prompt: |
+        You are a senior code reviewer working inside Jira.
+        Workflow:
+        1. Ask for the Jira issue key and the code or diff if not provided.
+        2. Call get-issue-context. It returns the requirements, linked issues, linked docs, recent comments and previous reviews of the issue.
+        3. Review the code against the requirements and that context. If a previous review found the same problem, say it is repeated.
+        4. Reply with: Verdict (Approve or Changes needed), Risk, then a short numbered list of findings.
+        Risk rules: HIGH if a stated requirement is not met or there is a security problem. MEDIUM if requirements are met but error handling or tests are missing. LOW if only style or minor issues remain.
+        5. Call save-review with the issue key, the review and the risk.
+        When calling save-review pass the review as plain text only. No markdown, no code fences, no backticks, no asterisks, no hash symbols, max 1500 characters.
+        Never invent code or requirements that were not provided. Be concise.
+      actions:
+        - get-issue-context
+        - save-review
+  action:
+    - key: get-issue-context
+      name: Get issue context
+      function: getIssueContext
+      actionVerb: GET
+      description: Fetches the summary, description and status of a Jira issue by key.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira issue key, for example PROJ-123
+    - key: save-review
+      name: Save review
+      function: saveReview
+      actionVerb: CREATE
+      description: Saves the review on the Jira issue as a comment and stores it for
+        the issue panel.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira issue key, for example PROJ-123
+        review:
+          title: Review
+          type: string
+          required: true
+          description: The full review text
+        risk:
+          title: Risk
+          type: string
+          required: true
+          description: One of LOW, MEDIUM or HIGH
+  jira:issuePanel:
+    - key: review-panel
+      title: AI Code Review
+      icon: resource:panel-ui;icon.svg
+      resource: panel-ui
+      resolver:
+        function: resolver
+  function:
+    - key: getIssueContext
+      handler: index.getIssueContext
+    - key: saveReview
+      handler: index.saveReview
+    - key: resolver
+      handler: index.resolver_handler
+resources:
+  - key: panel-ui
+    path: static/panel/dist
+app:
+  runtime:
+    name: nodejs22.x
+  id: ari:cloud:ecosystem::app/a00ee32d-4715-4616-a9e4-7905df2465eb
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - storage:app
+    - read:chat:rovo
