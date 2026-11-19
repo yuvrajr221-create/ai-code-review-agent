@@ -1,4 +1,10 @@
 modules:
+  rovo:mcp:
+    - key: ai-review-mcp
+      name: AI Code Review MCP
+      tools:
+        - get-issue-context
+        - save-review
   rovo:agent:
     - key: code-review-agent
       name: AI Code Review Agent
