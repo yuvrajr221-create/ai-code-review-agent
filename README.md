@@ -1,6 +1,6 @@
 # AI Code Review Agent for Jira (Atlassian Forge + Rovo)
 
-Codegeist 2026 submission · Category: **Apps for Software Teams** · Bonus: **Best Agents (Rovo)**
+Codegeist 2026 submission · Category: **Apps for Software Teams** · Bonus prizes: **Best Agents (Rovo)** and **Best app with Atlassian MCP**
 
 A Rovo agent that reviews code **against the context of a Jira issue** instead of in isolation. It reads the requirements, linked issues, recent comments and the previous reviews of the same issue, then saves a structured verdict back to Jira.
 
@@ -23,6 +23,7 @@ A Rovo agent that reviews code **against the context of a Jira issue** instead o
 |---|---|
 | Agent | Forge `rovo:agent` module |
 | Tools | Forge `action` modules: `get-issue-context`, `save-review` |
+| MCP server | Forge `rovo:mcp` module ("AI Code Review MCP") exposing both actions as MCP tools |
 | Backend | Forge functions (Node.js), Jira REST API v3, Forge KVS storage |
 | Frontend | `jira:issuePanel` with Custom UI (React + Vite) and `@forge/bridge` |
 | Scopes | `read:jira-work`, `write:jira-work`, `storage:app`, `read:chat:rovo` |
@@ -46,12 +47,19 @@ Requirements: a Jira Cloud site where **Rovo is enabled**. A free developer site
 
 Each agent run uses Rovo credits.
 
+## MCP server (Atlassian MCP bonus)
+The same two actions are exposed as MCP tools through the Forge `rovo:mcp` module, so Rovo Studio agents and MCP-compatible clients can call them:
+- `get-issue-context` reads the requirements, linked issues, comments and previous reviews of an issue.
+- `save-review` posts a review comment, sets the `ai-risk-*` label and stores the review.
+
+A site admin enables the tools under Atlassian Administration > Connected apps > ai-review-agent > Tools > Enable tools. The per-app endpoint is `https://mcp.atlassian.com/forge/a00ee32d-4715-4616-a9e4-7905df2465eb`. The module is in Preview.
+
 ## Privacy
 Reviews are stored only in the app's Forge Storage on your Atlassian site. See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md).
 
 ## Known limitations
 - Code is pasted into Rovo Chat; there is no automatic pull request fetch yet.
-- Teamwork Graph and MCP integrations are not part of this version.
+- Teamwork Graph integration is not part of this version.
 - The panel must be added to an issue once through the Apps icon.
 
 ## License
