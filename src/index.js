@@ -35,7 +35,85 @@ const loadHistory = async (issueKey) => {
   }
 };
 
-export const getIssueContext = async (payload) => {
+
+const twg = async (query, variables) => {
+  const r = await api.asUser().requestTeamworkGraph(query, variables);
+  return r.json();
+};
+
+const short = (v) => String(v && v.message ? v.message : v).slice(0, 160);
+
+const graphContext = async (issueId, cloudId) => {
+  const out = { connected: false, hierarchy: [], linkedPullRequests: [], goalsCount: 0, notes: [] };
+  try {
+    const e = await twg('query codereview_echo { echo(myString: "ping") }');
+    out.connected = e?.data?.echo === 'ping';
+  } catch (err) {
+    out.notes.push('echo: ' + short(err));
+  }
+  if (!cloudId || !issueId) {
+    out.notes.push('cloudId or issueId missing');
+    return out;
+  }
+  const ari = `ari:cloud:jira:${cloudId}:issue/${issueId}`;
+
+  let kinds = [];
+  try {
+    const en = await twg(
+      'query codereview_kinds { __type(name: "JiraWorkItemHierarchyKind") { enumValues { name } } }'
+    );
+    kinds = (en?.data?.__type?.enumValues || []).map((v) => v.name).filter((n) => n === 'PARENT' || n === 'CHILD');
+  } catch (err) {
+    out.notes.push('kinds: ' + short(err));
+  }
+  for (const k of kinds) {
+    if (!/^[A-Z_]+$/.test(k)) continue;
+    try {
+      const h = await twg(
+        `query codereview_hierarchy($id: ID!) { jiraWorkItemHierarchy(id: $id, kinds: [${k}], first: 10) { edges { node { ... on JiraWorkItem { key summary webUrl } } } } }`,
+        { id: ari }
+      );
+      if (h?.errors?.length) {
+        out.notes.push(`hierarchy ${k}: ` + short(h.errors[0]));
+        continue;
+      }
+      for (const edge of h?.data?.jiraWorkItemHierarchy?.edges || []) {
+        const n = edge?.node;
+        if (n?.key) out.hierarchy.push(`${k}: ${n.key} - ${n.summary}`);
+      }
+    } catch (err) {
+      out.notes.push(`hierarchy ${k}: ` + short(err));
+    }
+  }
+
+  try {
+    const pr = await twg(
+      'query codereview_pullRequests($id: ID!) { jiraWorkItemLinkedExternalPullRequests(id: $id, first: 5) { edges { node { ... on ExternalPullRequest { displayName description lastUpdatedAt } } } } }',
+      { id: ari }
+    );
+    if (pr?.errors?.length) out.notes.push('pull requests: ' + short(pr.errors[0]));
+    for (const edge of pr?.data?.jiraWorkItemLinkedExternalPullRequests?.edges || []) {
+      const n = edge?.node;
+      if (n?.displayName) out.linkedPullRequests.push(`${n.displayName}: ${cut(n.description, 200)}`);
+    }
+  } catch (err) {
+    out.notes.push('pull requests: ' + short(err));
+  }
+
+  try {
+    const g = await twg(
+      'query codereview_goals($id: ID!) { jiraWorkItemGoals(id: $id, first: 5) { edges { node { __typename } } } }',
+      { id: ari }
+    );
+    if (g?.errors?.length) out.notes.push('goals: ' + short(g.errors[0]));
+    out.goalsCount = (g?.data?.jiraWorkItemGoals?.edges || []).length;
+  } catch (err) {
+    out.notes.push('goals: ' + short(err));
+  }
+  return out;
+};
+
+export const getIssueContext = async (payload, context) => {
   const issueKey = cleanKey(payload.issueKey);
   if (!KEY_RE.test(issueKey)) return { error: `Invalid issue key: ${issueKey}` };
 
@@ -43,7 +121,8 @@ export const getIssueContext = async (payload) => {
     route`/rest/api/3/issue/${issueKey}?fields=summary,description,status,priority,labels,issuelinks,comment`
   );
   if (!res.ok) return { error: `Could not read ${issueKey} (HTTP ${res.status})` };
-  const { fields } = await res.json();
+  const issue = await res.json();
+  const { fields } = issue;
 
   const linkedIssues = (fields.issuelinks || []).slice(0, 10).map((l) => {
     const other = l.outwardIssue || l.inwardIssue;
@@ -72,8 +151,12 @@ export const getIssueContext = async (payload) => {
   const history = await loadHistory(issueKey);
   const previousReviews = history.slice(0, 3).map((h) => `${h.at.slice(0, 10)} risk ${h.risk}: ${cut(h.review, 300)}`);
 
+  const cloudId = payload?.context?.cloudId || context?.cloudId;
+  const teamworkGraph = await graphContext(issue.id, cloudId);
+
   return {
     issueKey,
+    teamworkGraph,
     summary: fields.summary,
     status: fields.status?.name,
     priority: fields.priority?.name,

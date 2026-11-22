@@ -1,6 +1,6 @@
 # AI Code Review Agent for Jira (Atlassian Forge + Rovo)
 
-Codegeist 2026 submission · Category: **Apps for Software Teams** · Bonus prizes: **Best Agents (Rovo)** and **Best app with Atlassian MCP**
+Codegeist 2026 submission · Category: **Apps for Software Teams** · Bonus prizes: **Best Agents (Rovo)** , **Best app with Atlassian MCP** and **Best apps with Teamwork Graph integration**
 
 A Rovo agent that reviews code **against the context of a Jira issue** instead of in isolation. It reads the requirements, linked issues, recent comments and the previous reviews of the same issue, then saves a structured verdict back to Jira.
 
@@ -10,7 +10,8 @@ A Rovo agent that reviews code **against the context of a Jira issue** instead o
    - the issue requirements (summary and description),
    - linked issues and linked docs,
    - recent comments,
-   - previous AI reviews of the same issue.
+   - previous AI reviews of the same issue,
+   - Teamwork Graph context: the parent epic, child items, linked pull requests and goals of the issue.
 3. The agent reviews the code against that context and answers with **Verdict**, **Risk** (LOW / MEDIUM / HIGH) and numbered findings. Risk follows fixed rules: HIGH if a requirement is not met or there is a security problem, MEDIUM if requirements are met but error handling or tests are missing, LOW for minor issues.
 4. After you confirm, the Forge action `save-review`:
    - posts the review as a Jira comment,
@@ -23,6 +24,7 @@ A Rovo agent that reviews code **against the context of a Jira issue** instead o
 |---|---|
 | Agent | Forge `rovo:agent` module |
 | Tools | Forge `action` modules: `get-issue-context`, `save-review` |
+| Teamwork Graph | `requestTeamworkGraph` from Forge, scope `read:graph:issue:jira` (hierarchy, linked pull requests, goals) |
 | MCP server | Forge `rovo:mcp` module ("AI Code Review MCP") exposing both actions as MCP tools |
 | Backend | Forge functions (Node.js), Jira REST API v3, Forge KVS storage |
 | Frontend | `jira:issuePanel` with Custom UI (React + Vite) and `@forge/bridge` |
@@ -54,12 +56,20 @@ The same two actions are exposed as MCP tools through the Forge `rovo:mcp` modul
 
 A site admin enables the tools under Atlassian Administration > Connected apps > ai-review-agent > Tools > Enable tools. The per-app endpoint is `https://mcp.atlassian.com/forge/a00ee32d-4715-4616-a9e4-7905df2465eb`. The module is in Preview.
 
+## Teamwork Graph integration (Teamwork Graph bonus)
+`get-issue-context` calls the Atlassian Teamwork Graph API from the Forge backend (`api.asUser().requestTeamworkGraph`) with the issue ARI and reads:
+- `jiraWorkItemHierarchy` with kinds `PARENT` and `CHILD` (the epic the work belongs to and its child items),
+- `jiraWorkItemLinkedExternalPullRequests` (pull requests linked to the issue),
+- `jiraWorkItemGoals` (goals the issue contributes to).
+
+The agent uses this as review context. Example: a review of DD-4 starts with the finding "Context: part of epic DD-5 - Signup flow", and the chat reply ends with a short Teamwork Graph summary. If the graph has nothing linked, the agent says so. The Teamwork Graph API is in Preview, and every query uses an operation name of the shape `company_operation` as the API requires.
+
 ## Privacy
 Reviews are stored only in the app's Forge Storage on your Atlassian site. See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md).
 
 ## Known limitations
 - Code is pasted into Rovo Chat; there is no automatic pull request fetch yet.
-- Teamwork Graph integration is not part of this version.
+- The Teamwork Graph API is in Preview: only hierarchy, linked pull requests and goals are read, and results are empty when nothing is linked.
 - The panel must be added to an issue once through the Apps icon.
 
 ## License

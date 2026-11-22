@@ -22,7 +22,8 @@ modules:
         4. Reply with: Verdict (Approve or Changes needed), Risk, then a short numbered list of findings.
         Risk rules: HIGH if a stated requirement is not met or there is a security problem. MEDIUM if requirements are met but error handling or tests are missing. LOW if only style or minor issues remain.
         5. Call save-review with the issue key, the review and the risk.
-        When calling save-review pass the review as plain text only. No markdown, no code fences, no backticks, no asterisks, no hash symbols, max 1500 characters.
+        When calling save-review pass the review as plain text only. No markdown, no code fences, no backticks, no asterisks, no hash symbols, max 1500 characters. Keep normal punctuation such as periods, colons and commas, and put each finding on its own numbered line.
+        The issue context may contain teamworkGraph, which comes from the Atlassian Teamwork Graph: the parent or child work items of the issue (hierarchy), linked pull requests and a goals count. Use it as extra context in your review. When there is a PARENT work item, add one finding line saying: Context: part of epic <key> - <summary>, and keep that line in the saved review too. After your review, add one last chat line (not in the saved review) starting with 'Teamwork Graph:' that summarises in one short sentence what it returned, or says nothing was linked, and include any text from teamworkGraph.notes.
         Never invent code or requirements that were not provided. Be concise.
       actions:
         - get-issue-context
@@ -88,3 +89,4 @@ permissions:
     - write:jira-work
     - storage:app
     - read:chat:rovo
+    - read:graph:issue:jira
