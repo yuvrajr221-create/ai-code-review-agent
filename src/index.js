@@ -13,6 +13,16 @@ const adfToText = (node) => {
   return ['paragraph', 'heading', 'listItem'].includes(node.type) ? inner + '\n' : inner;
 };
 
+const collectCode = (node, acc = []) => {
+  if (!node) return acc;
+  if (node.type === 'codeBlock') {
+    const t = (node.content || []).map((c) => c.text || '').join('');
+    if (t.trim()) acc.push(t.trim());
+  }
+  (node.content || []).forEach((c) => collectCode(c, acc));
+  return acc;
+};
+
 const toAdf = (text) => ({
   type: 'doc',
   version: 1,
@@ -138,6 +148,13 @@ export const getIssueContext = async (payload, context) => {
     .slice(-5)
     .map((c) => `${c.by}: ${cut(c.text, 300)}`);
 
+  const codeBlocks = [];
+  collectCode(fields.description).forEach((c) => codeBlocks.push(`[issue description] ${cut(c, 3000)}`));
+  (fields.comment?.comments || []).forEach((c) => {
+    if (adfToText(c.body).trim().startsWith('AI Code Review')) return;
+    collectCode(c.body).forEach((code) => codeBlocks.push(`[comment by ${c.author?.displayName}] ${cut(code, 3000)}`));
+  });
+
   let remoteLinks = [];
   try {
     const rl = await jira(route`/rest/api/3/issue/${issueKey}/remotelink`);
@@ -153,6 +170,17 @@ export const getIssueContext = async (payload, context) => {
 
   const cloudId = payload?.context?.cloudId || context?.cloudId;
   const teamworkGraph = await graphContext(issue.id, cloudId);
+  try {
+    await kvs.set(`graph:${issueKey}`, {
+      at: new Date().toISOString(),
+      parents: teamworkGraph.hierarchy.filter((x) => x.startsWith('PARENT')).map((x) => x.replace(/^PARENT: /, '')),
+      children: teamworkGraph.hierarchy.filter((x) => x.startsWith('CHILD')).length,
+      pullRequests: teamworkGraph.linkedPullRequests.length,
+      goals: teamworkGraph.goalsCount,
+    });
+  } catch (e) {
+    // graph summary is optional
+  }
 
   return {
     issueKey,
@@ -165,6 +193,7 @@ export const getIssueContext = async (payload, context) => {
     linkedIssues,
     linkedDocs: remoteLinks,
     recentComments: comments,
+    codeBlocks: codeBlocks.slice(-3),
     previousReviews,
   };
 };
@@ -212,7 +241,13 @@ export const saveReview = async (payload) => {
 const resolver = new Resolver();
 resolver.define('getReviews', async ({ payload }) => {
   const issueKey = cleanKey(payload?.issueKey);
-  if (!KEY_RE.test(issueKey)) return [];
-  return loadHistory(issueKey);
+  if (!KEY_RE.test(issueKey)) return { reviews: [], graph: null };
+  let graph = null;
+  try {
+    graph = (await kvs.get(`graph:${issueKey}`)) || null;
+  } catch (e) {
+    graph = null;
+  }
+  return { reviews: await loadHistory(issueKey), graph };
 });
 export const resolver_handler = resolver.getDefinitions();

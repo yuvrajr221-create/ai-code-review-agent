@@ -5,7 +5,7 @@ Codegeist 2026 submission · Category: **Apps for Software Teams** · Bonus priz
 A Rovo agent that reviews code **against the context of a Jira issue** instead of in isolation. It reads the requirements, linked issues, recent comments and the previous reviews of the same issue, then saves a structured verdict back to Jira.
 
 ## What it does
-1. In Rovo Chat you pick **AI Code Review Agent** and paste a code snippet or diff with an issue key (for example `DD-1`).
+1. In Rovo Chat you pick **AI Code Review Agent** and either paste a code snippet with an issue key (for example `DD-1`), or just say `Review DD-1`. In that case the agent uses the most recent code block found in the issue description or comments.
 2. The agent calls the Forge action `get-issue-context`, which returns:
    - the issue requirements (summary and description),
    - linked issues and linked docs,
@@ -17,7 +17,7 @@ A Rovo agent that reviews code **against the context of a Jira issue** instead o
    - posts the review as a Jira comment,
    - adds a label such as `ai-risk-high`,
    - stores the review in Forge Storage.
-5. The **AI Code Review** issue panel (React Custom UI) shows the latest risk badge, the risk trend (for example HIGH -> LOW) and the full review history.
+5. The **AI Code Review** issue panel (React Custom UI) shows the latest risk badge, the risk trend (for example HIGH -> LOW), counts per risk level, Teamwork Graph chips (parent epic, linked pull requests, goals) and the full review history with expandable cards.
 
 ## Architecture
 | Part | Technology |
@@ -68,9 +68,10 @@ The agent uses this as review context. Example: a review of DD-4 starts with the
 Reviews are stored only in the app's Forge Storage on your Atlassian site. See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md).
 
 ## Known limitations
-- Code is pasted into Rovo Chat; there is no automatic pull request fetch yet.
+- Code comes from Rovo Chat or from a code block in the issue. Pull requests are not fetched automatically, because that would need an external connection and the app would no longer be Runs on Atlassian.
 - The Teamwork Graph API is in Preview: only hierarchy, linked pull requests and goals are read, and results are empty when nothing is linked.
 - The panel must be added to an issue once through the Apps icon.
+- The agent needs Rovo to be enabled on the Jira site, and each run uses Rovo credits.
 
 ## License
 MIT
