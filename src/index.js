@@ -200,11 +200,22 @@ export const getIssueContext = async (payload, context) => {
 
 export const saveReview = async (payload) => {
   const issueKey = cleanKey(payload.issueKey);
-  const risk = String(payload.risk || '').toUpperCase();
-  const review = cut(cleanText(payload.review), 1500);
+  let risk = String(payload.risk || '').toUpperCase();
+  let review = cut(cleanText(payload.review), 1500);
   if (!KEY_RE.test(issueKey)) return { error: `Invalid issue key: ${issueKey}` };
   if (!VALID_RISK.includes(risk)) return { error: 'risk must be LOW, MEDIUM or HIGH' };
   if (!review) return { error: 'review is empty' };
+
+  // Deterministic guard: a review that reports an unmet requirement or a security problem is always HIGH.
+  const HIGH_CUES = [
+    /\brequirements?\b[^.\n]{0,20}\bnot (met|satisfied|implemented)\b/i,
+    /\bnot met\b/i,
+    /security (vulnerabilit|issue|risk|problem)/i,
+  ];
+  if (risk !== 'HIGH' && HIGH_CUES.some((re) => re.test(review))) {
+    review = cut(`${review}\nRisk raised to HIGH: the review reports an unmet requirement or a security problem.`, 1600);
+    risk = 'HIGH';
+  }
 
   const res = await jira(route`/rest/api/3/issue/${issueKey}/comment`, {
     method: 'POST',
