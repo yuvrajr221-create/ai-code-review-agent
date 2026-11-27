@@ -2,6 +2,8 @@
 
 Codegeist 2026 submission · Category: **Apps for Software Teams** · Bonus prizes: **Best Agents (Rovo)** , **Best app with Atlassian MCP** and **Best apps with Teamwork Graph integration**
 
+Demo video: https://youtu.be/Y7_0yMag_5Q
+
 A Rovo agent that reviews code **against the context of a Jira issue** instead of in isolation. It reads the requirements, linked issues, recent comments and the previous reviews of the same issue, then saves a structured verdict back to Jira.
 
 ## What it does
